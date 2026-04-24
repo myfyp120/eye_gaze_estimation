@@ -594,7 +594,7 @@ import qtawesome as qta
 import time
 
 from camera.webcam_thread import WebcamThread
-from model.model_interface import GazeEstimator
+from ui_model.model_interface import GazeEstimator
 from utils.drawing import draw_gaze_point
 from utils.colors import (BG, SURFACE, PANEL, ACCENT, HIGHLIGHT,
                         TEAL, TEXT_PRIMARY, TEXT_SEC, BUTTON_STYLE)

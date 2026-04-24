@@ -15,7 +15,7 @@ from PyQt6.QtCore    import (Qt, QTimer, QRect, QPointF, QRectF, pyqtSignal)
 from PyQt6.QtGui     import (QPainter, QColor, QPen, QBrush, QRadialGradient, QLinearGradient, QFont)
 import qtawesome as qta
 
-from model.calibration_manager import CalibrationManager, CALIB_POINTS
+from ui_model.calibration_manager import CalibrationManager, CALIB_POINTS
 from utils.colors import (BG, SURFACE, PANEL, ACCENT, HIGHLIGHT, TEAL, TEXT_PRIMARY, TEXT_SEC)
 
 # ── How long (ms) the user stares at each point ───────────

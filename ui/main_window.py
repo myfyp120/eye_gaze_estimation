@@ -178,6 +178,11 @@ from ui.screens.settings_screen import SettingsScreen
 from ui.screens.about_screen import AboutScreen
 from ui.screens.dashboard_screen import DashboardScreen
 from ui.screens.calibration_screen import CalibrationScreen
+import cv2
+from ui_model.gaze_predictor  import GazePredictor
+from ui_model.face_detector   import FaceDetector
+from ui.calibration import CalibrationScreen
+
 
 
 class MainWindow(QMainWindow):
@@ -186,6 +191,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Through the Iris")
         self.setMinimumSize(1000, 650)
         self._build_ui()
+        self._init_gaze() 
 
     def _build_ui(self):
         central = QWidget()
@@ -273,3 +279,101 @@ class MainWindow(QMainWindow):
         self.home_screen.stop_camera()
         self.dashboard_screen.stop_session()
         event.accept()
+        
+    # ── 3. Add these methods to your MainWindow class ─────────────
+
+def _init_gaze(self):
+    CKPT_PATH = 'C:/Users/aqsam/eye_gaze_estimation/checkpoint/best_eth_ckpt.pth/best_eth_ckpt.pth'
+
+    self.predictor     = GazePredictor(CKPT_PATH)
+    self.face_detector = FaceDetector(min_confidence=0.7)
+
+    screen        = self.screen().geometry()
+    self.screen_w = screen.width()
+    self.screen_h = screen.height()
+
+    # Single shared webcam cap — passed to CalibrationScreen too
+    self.cap = cv2.VideoCapture(0)
+    self.cap.set(cv2.CAP_PROP_FRAME_WIDTH,  640)
+    self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+    self.cap.set(cv2.CAP_PROP_FPS, 30)
+
+    # Gaze tracking timer
+    self.frame_timer = QTimer()
+    self.frame_timer.timeout.connect(self._process_frame)
+    self.frame_timer.start(33)  # ~30fps
+
+    # ── Issue 12 fix: add button to your actual layout ────────
+    # Look at your MainWindow and find the toolbar or layout name.
+    # Replace 'self.your_toolbar' with whatever it actually is.
+    # Common names: self.toolbar, self.top_bar, self.controls,
+    #               self.main_layout, self.sidebar
+    
+    from PyQt6.QtWidgets import QPushButton, QLabel
+    self.calib_btn = QPushButton("🎯 Calibrate Gaze")
+    self.calib_btn.setFixedSize(160, 36)
+    self.calib_btn.clicked.connect(self.start_calibration)
+    self.your_toolbar.addWidget(self.calib_btn)  # ← replace toolbar name
+
+    self.calib_status = QLabel("Not calibrated")
+    self.calib_status.setStyleSheet("color:#888; font-size:13px;")
+    self.your_toolbar.addWidget(self.calib_status)  # ← same here
+
+def _process_frame(self):
+    ret, frame = self.cap.read()
+    if not ret:
+        return
+    face = self.face_detector.detect_and_crop(frame)
+    if face is None:
+        return
+    try:
+        x_px, y_px = self.predictor.predict_screen(
+            face, self.screen_w, self.screen_h,
+            dist_cm=60, screen_w_cm=34, screen_h_cm=19)
+        # Show gaze point — use whatever overlay system your UI has
+        # self.overlay.update_gaze(x_px, y_px)
+    except Exception as e:
+        print(f"Gaze error: {e}")
+
+def start_calibration(self):
+    self.frame_timer.stop()
+    self.calib_btn.setEnabled(False)
+    self.calib_btn.setText("Calibrating...")
+    # Issue 10 fix: pass self.cap — no second VideoCapture opened
+    self.calib_screen = CalibrationScreen(
+        face_detector=self.face_detector,
+        cap=self.cap)
+    self.calib_screen.calibration_done.connect(
+        self._on_calibration_done)
+    self.calib_screen.calibration_failed.connect(
+        self._on_calibration_failed)
+
+def _on_calibration_done(self, face_crops, dot_positions):
+    self.predictor.calibrate(
+        face_crops_bgr=face_crops,
+        dot_positions_px=dot_positions,
+        screen_w=self.screen_w,
+        screen_h=self.screen_h,
+        dist_cm=60, screen_w_cm=34, screen_h_cm=19)
+    self.calib_btn.setEnabled(True)
+    self.calib_btn.setText("✅ Recalibrate")
+    self.calib_status.setText(
+        f"Calibrated ({len(face_crops)} pts)")
+    self.calib_status.setStyleSheet(
+        "color:#4caf50; font-size:13px;")
+    self.frame_timer.start(33)
+
+def _on_calibration_failed(self, msg):
+    from PyQt6.QtWidgets import QMessageBox
+    QMessageBox.warning(self, "Calibration Failed", msg)
+    self.calib_btn.setEnabled(True)
+    self.calib_btn.setText("🎯 Calibrate Gaze")
+    self.frame_timer.start(33)
+
+def closeEvent(self, event):
+    self.frame_timer.stop()
+    if hasattr(self, 'cap') and self.cap.isOpened():
+        self.cap.release()
+    if hasattr(self, 'face_detector'):
+        self.face_detector.close()
+    super().closeEvent(event)    

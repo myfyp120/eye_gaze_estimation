@@ -31,3 +31,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+    
+    # pip install -r requirements.txt   (Use this to install all libraries needed)
